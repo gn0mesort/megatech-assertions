@@ -11,7 +11,7 @@
 
 namespace megatech::internal::base {
 
-  void dispatch_assertion_failure(const std::source_location& location, char* const message) {
+  void dispatch_assertion_failure(const std::source_location& location, char* const message) noexcept {
       // std::fprintf can, of course, fail. However, if this happens we are so screwed that it's not recoverable here.
       const auto res = std::fprintf(stderr, MEGATECH_ASSERTION_FAILURE_FORMATTER, location.file_name(),
                                     location.line(), message);
@@ -26,7 +26,7 @@ namespace megatech::internal::base {
       std::abort();
   }
 
-  void dispatch_assertion_error(const std::source_location& location) {
+  void dispatch_assertion_error(const std::source_location& location) noexcept {
     const auto res = std::fprintf(stderr, MEGATECH_ASSERTION_ERROR_FORMATTER, location.file_name(), location.line());
     if (res < 0)
     {
@@ -35,12 +35,37 @@ namespace megatech::internal::base {
     std::abort();
   }
 
+  void debug_assertion_format(const std::source_location& location, const bool condition,
+                              const std::string_view& format, const std::size_t message_size,
+                              std::format_args&& args) noexcept {
+    if (!condition)
+    {
+      try
+      {
+        // The reason to do this is to ensure that there is exactly one call for printing errors.
+        // Although std::string is "safer" this is a trivial memory operation.
+        // internal::base::dispatch_assertion_failure will always call std::free(message).
+        auto message = reinterpret_cast<char*>(std::calloc(message_size + 1, sizeof(char)));
+        if (!message)
+        {
+          dispatch_assertion_error(location);
+        }
+        std::vformat_to(&message[0], format, args);
+        dispatch_assertion_failure(location, message);
+      }
+      catch (...)
+      {
+        dispatch_assertion_error(location);
+      }
+    }
+  }
+
 }
 
 namespace megatech {
 
   void debug_assertion_printf(const std::source_location& location, const bool condition,
-                              const char *const format, ...) {
+                              const char *const format, ...) noexcept {
     if (!condition)
     {
       // va_lists require this declaration style specifically.
@@ -65,37 +90,13 @@ namespace megatech {
         va_end(args_cp);
         internal::base::dispatch_assertion_error(location);
       }
-      if (auto res = std::vsnprintf(message, sz, format, args_cp); res < 0)
+      if (auto res = std::vsnprintf(message, sz + 1, format, args_cp); res < 0)
       {
         va_end(args_cp);
         internal::base::dispatch_assertion_error(location);
       }
       va_end(args_cp);
-    }
-  }
-
-  void debug_assertion_format(const std::source_location& location, const bool condition,
-                              const std::string_view& format, const std::size_t message_size,
-                              std::format_args&& args) {
-    if (!condition)
-    {
-      try
-      {
-        // The reason to do this is to ensure that there is exactly one call for printing errors.
-        // Although std::string is "safer" this is a trivial memory operation.
-        // internal::base::dispatch_assertion_failure will always call std::free(message).
-        auto message = reinterpret_cast<char*>(std::calloc(message_size + 1, sizeof(char)));
-        if (!message)
-        {
-          internal::base::dispatch_assertion_error(location);
-        }
-        std::vformat_to(&message[0], format, args);
-        internal::base::dispatch_assertion_failure(location, message);
-      }
-      catch (...)
-      {
-        internal::base::dispatch_assertion_error(location);
-      }
+      internal::base::dispatch_assertion_failure(location, message);
     }
   }
 

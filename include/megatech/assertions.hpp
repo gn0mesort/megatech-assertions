@@ -8,7 +8,11 @@
 #define MEGATECH_ASSERTION_TYPE_PRINTF (1)
 #define MEGATECH_ASSERTION_TYPE_FORMAT (2)
 
-#ifndef MEGATECH_DEFAULT_ASSERTION_TYPE
+#if defined(MEGATECH_DEFAULT_ASSERTION_TYPE_PRINTF)
+  #define MEGATECH_DEFAULT_ASSERTION_TYPE MEGATECH_ASSERTION_TYPE_PRINTF
+#elif defined(MEGATECH_DEFAULT_ASSERTION_TYPE_FORMAT)
+  #define MEGATECH_DEFAULT_ASSERTION_TYPE MEGATECH_ASSERTION_TYPE_FORMAT
+#else
   #ifdef MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
     #define MEGATECH_DEFAULT_ASSERTION_TYPE MEGATECH_ASSERTION_TYPE_FORMAT
   #else
@@ -20,7 +24,7 @@
   #error "<format> based assertions are not available."
 #endif
 
-#ifndef MEGATECH_ASSERTIONS_ENABLED
+#ifndef MEGATECH_DISABLE_ASSERTIONS
   #ifndef NDEBUG
     #define MEGATECH_ASSERTIONS_ENABLED (1)
   #endif
@@ -37,14 +41,14 @@
 
 #ifdef MEGATECH_ASSERTIONS_ENABLED
   #define MEGATECH_ASSERT_MSG_PRINTF(exp, msg, ...) \
-    (debug_assertion_printf(std::source_location::current(), (exp), (msg) __VA_OPT__(,) __VA_ARGS__))
+    (megatech::debug_assertion_printf(std::source_location::current(), (exp), (msg) __VA_OPT__(,) __VA_ARGS__))
   #define MEGATECH_PRECONDITION_MSG_PRINTF(exp, msg, ...) \
     MEGATECH_ASSERT_MSG_PRINTF((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
   #define MEGATECH_POSTCONDITION_MSG_PRINTF(exp, msg, ...) \
     MEGATECH_ASSERT_MSG_PRINTF((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
   #if MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
     #define MEGATECH_ASSERT_MSG_FORMAT(exp, msg, ...) \
-      (debug_assertion_format(std::source_location::current(), (exp), (msg) __VA_OPT__(,) __VA_ARGS__))
+      (megatech::debug_assertion_format(std::source_location::current(), (exp), (msg) __VA_OPT__(,) __VA_ARGS__))
     #define MEGATECH_PRECONDITION_MSG_FORMAT(exp, msg, ...) \
       MEGATECH_ASSERT_MSG_FORMAT((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
     #define MEGATECH_POSTCONDITION_MSG_FORMAT(exp, msg, ...) \
@@ -82,30 +86,32 @@
 namespace megatech::internal::base {
 
   [[noreturn]]
-  void dispatch_assertion_failure(const std::source_location& location, char* const message);
+  void dispatch_assertion_failure(const std::source_location& location, char* const message) noexcept;
 
   [[noreturn]]
-  void dispatch_assertion_error(const std::source_location& location);
+  void dispatch_assertion_error(const std::source_location& location) noexcept;
+
+#if MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
+  void debug_assertion_format(const std::source_location& location, const bool condition,
+                              const std::string_view& format, const std::size_t message_size,
+                              std::format_args&& args) noexcept;
+#endif
 
 }
 
 namespace megatech {
 
   void debug_assertion_printf(const std::source_location& location, const bool condition,
-                              const char *const format, ...);
+                              const char *const format, ...) noexcept;
 
 #if MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
-  void debug_assertion_format(const std::source_location& location, const bool condition,
-                              const std::string_view& format, const std::size_t message_size, std::format_args&& args);
-
   template <typename... Args>
   void debug_assertion_format(const std::source_location& location, const bool condition,
-                              const std::format_string<Args...>& format, Args&&... args) {
+                              const std::format_string<Args...>& format, Args&&... args) noexcept {
     try
     {
-      const auto size = std::formatted_size(std::forward<std::format_string<Args...>>(format),
-                                            std::forward<Args>(args)...);
-      debug_assertion_format(location, condition, format, size, std::make_format_args(args...));
+      const auto size = std::formatted_size(format, std::forward<Args>(args)...);
+      internal::base::debug_assertion_format(location, condition, format.get(), size, std::make_format_args(args...));
     }
     catch (...)
     {
