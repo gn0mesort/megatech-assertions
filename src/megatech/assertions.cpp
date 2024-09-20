@@ -16,7 +16,7 @@ namespace megatech::internal::base {
       const auto res = std::fprintf(stderr, MEGATECH_ASSERTION_FAILURE_FORMATTER, location.file_name(),
                                     location.line(), message);
       std::free(message);
-      if (res < 0)
+      [[unlikely]] if (res < 0)
       {
         // This is really the best I can do. If there was an error then, perhaps, perror will still function as
         // intended. Realistically, if you're in a scenario where you can't write to stderr (and you haven't
@@ -28,7 +28,7 @@ namespace megatech::internal::base {
 
   void dispatch_assertion_error(const std::source_location& location) noexcept {
     const auto res = std::fprintf(stderr, MEGATECH_ASSERTION_ERROR_FORMATTER, location.file_name(), location.line());
-    if (res < 0)
+    [[unlikely]] if (res < 0)
     {
       std::perror("megatech-assertions");
     }
@@ -48,7 +48,7 @@ namespace megatech::internal::base {
         // Although std::string is "safer" this is a trivial memory operation.
         // internal::base::dispatch_assertion_failure will always call std::free(message).
         message = reinterpret_cast<char*>(std::calloc(message_size + 1, sizeof(char)));
-        if (!message)
+        [[unlikely]] if (!message)
         {
           dispatch_assertion_error(location);
         }
