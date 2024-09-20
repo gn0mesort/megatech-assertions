@@ -1,3 +1,10 @@
+/**
+ * @file assertions.cpp
+ * @brief Run-Time Assertion Implementation
+ * @author Alexander Rothman <[gnomesort@megate.ch](mailto:gnomesort@megate.ch)>
+ * @copyright AGPL-3.0-or-later
+ * @date 2024
+ */
 #include "megatech/assertions.hpp"
 
 #include <cinttypes>

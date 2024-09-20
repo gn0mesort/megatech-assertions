@@ -26,6 +26,7 @@ doxygen = find_program('doxygen', disabler: true)
 doc_env = environment()
 doc_env.set('DOXYGEN_PROJECT_NAME', meson.project_name())
 doc_env.set('DOXYGEN_PROJECT_NUMBER', meson.project_version())
+doc_env.set('DOXYGEN_PROJECT_BRIEF', 'Debug Assertion Library')
 doc_env.set('DOXYGEN_OUTPUT_DIRECTORY', meson.current_build_dir() / 'documentation')
 doc_inputs = [ meson.current_source_dir() / 'include', files('documentation/namespaces.dox')[0].full_path(),
                files('README.md')[0].full_path() ]
