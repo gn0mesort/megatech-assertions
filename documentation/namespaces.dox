@@ -1,0 +1,14 @@
+/**
+ * @namespace megatech
+ * @brief Megatech Classes and Utilities
+ */
+/// @cond INTERNAL
+/**
+ * @namespace megatech::internal
+ * @brief Internal Functionality
+ */
+/**
+ * @namespace megatech::internal::base
+ * @brief Cross-Platform Internal Functionality
+ */
+/// @endcond

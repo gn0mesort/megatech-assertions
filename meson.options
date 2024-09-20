@@ -1,1 +1,3 @@
 option('tests', type: 'feature', value: 'disabled', description: 'Build unit tests. Disabled by default.')
+option('enabled_doxygen_sections', type: 'array', value: [],
+       description: 'Extra sections, on top of the default, to enable when generating documentation.')
