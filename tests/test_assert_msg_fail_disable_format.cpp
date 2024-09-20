@@ -1,4 +1,4 @@
-#define MEGATECH_ASSERTIONS_DISABLE_FORMAT (1)
+#define MEGATECH_ASSERTIONS_FORMAT_UNAVAILABLE (1)
 #include <megatech/assertions.hpp>
 
 int main() {

@@ -1,4 +1,4 @@
-#define MEGATECH_DISABLE_ASSERTIONS (1)
+#define MEGATECH_ASSERTIONS_DISABLED (1)
 #include <megatech/assertions.hpp>
 
 int main() {

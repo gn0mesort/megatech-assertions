@@ -35,17 +35,19 @@ namespace megatech::internal::base {
     std::abort();
   }
 
+#ifdef MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
   void debug_assertion_format(const std::source_location& location, const bool condition,
                               const std::string_view& format, const std::size_t message_size,
                               std::format_args&& args) noexcept {
     if (!condition)
     {
+      auto message = static_cast<char*>(nullptr);
       try
       {
-        // The reason to do this is to ensure that there is exactly one call for printing errors.
+        // The reason to do this is to ensure that there is exactly one call for printing messages.
         // Although std::string is "safer" this is a trivial memory operation.
         // internal::base::dispatch_assertion_failure will always call std::free(message).
-        auto message = reinterpret_cast<char*>(std::calloc(message_size + 1, sizeof(char)));
+        message = reinterpret_cast<char*>(std::calloc(message_size + 1, sizeof(char)));
         if (!message)
         {
           dispatch_assertion_error(location);
@@ -55,10 +57,15 @@ namespace megatech::internal::base {
       }
       catch (...)
       {
+        if (message)
+        {
+          std::free(message);
+        }
         dispatch_assertion_error(location);
       }
     }
   }
+#endif
 
 }
 
@@ -93,6 +100,7 @@ namespace megatech {
       if (auto res = std::vsnprintf(message, sz + 1, format, args_cp); res < 0)
       {
         va_end(args_cp);
+        std::free(message);
         internal::base::dispatch_assertion_error(location);
       }
       va_end(args_cp);
