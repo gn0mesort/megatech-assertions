@@ -1,3 +1,5 @@
+pymod = import('python')
+python3 = pymod.find_installation('python3')
 runner = find_program('test-runner.py')
 args = [ '-UNDEBUG' ]
 dependencies = [ megatech_assertions_dep ]

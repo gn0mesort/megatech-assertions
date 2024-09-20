@@ -19,4 +19,6 @@ sources = [ files('src/megatech/assertions.cpp') ]
 megatech_assertions_lib = library(meson.project_name(), sources, include_directories: includes,
                                   version: meson.project_version())
 megatech_assertions_dep = declare_dependency(link_with: megatech_assertions_lib, include_directories: includes)
-subdir('tests')
+if get_option('tests').allowed()
+  subdir('tests')
+endif
