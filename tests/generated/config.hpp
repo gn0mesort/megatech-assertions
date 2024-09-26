@@ -1,0 +1,7 @@
+#ifndef CONFIG_HPP
+#define CONFIG_HPP
+
+#mesondefine CONFIG_TEST_MAX_THREADS
+#mesondefine CONFIG_TEST_TRUNCATION_STRING
+
+#endif

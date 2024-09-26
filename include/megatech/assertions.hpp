@@ -273,21 +273,19 @@
 #include <string_view>
 
 #ifdef MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
-  #include <cstddef>
-
   #include <format>
 #endif
 
 #ifdef MEGATECH_ASSERTIONS_ENABLED
   #define MEGATECH_ASSERT_MSG_PRINTF(exp, msg, ...) \
-    (megatech::debug_assertion_printf(std::source_location::current(), (exp), (msg) __VA_OPT__(,) __VA_ARGS__))
+    (megatech::debug_assertion_printf(std::source_location::current(), (exp), (#exp), (msg) __VA_OPT__(,) __VA_ARGS__))
   #define MEGATECH_PRECONDITION_MSG_PRINTF(exp, msg, ...) \
     MEGATECH_ASSERT_MSG_PRINTF((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
   #define MEGATECH_POSTCONDITION_MSG_PRINTF(exp, msg, ...) \
     MEGATECH_ASSERT_MSG_PRINTF((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
   #ifdef MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
     #define MEGATECH_ASSERT_MSG_FORMAT(exp, msg, ...) \
-      (megatech::debug_assertion_format(std::source_location::current(), (exp), (msg) __VA_OPT__(,) __VA_ARGS__))
+      (megatech::debug_assertion_format(std::source_location::current(), (exp), (#exp), (msg) __VA_OPT__(,) __VA_ARGS__))
     #define MEGATECH_PRECONDITION_MSG_FORMAT(exp, msg, ...) \
       MEGATECH_ASSERT_MSG_FORMAT((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
     #define MEGATECH_POSTCONDITION_MSG_FORMAT(exp, msg, ...) \
@@ -298,7 +296,7 @@
   #elif defined(MEGATECH_ASSERTIONS_DEFAULT_FORMATTER_FORMAT)
     #define MEGATECH_ASSERT_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG_FORMAT((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
   #endif
-  #define MEGATECH_ASSERT(exp) MEGATECH_ASSERT_MSG((exp), (#exp))
+  #define MEGATECH_ASSERT(exp) (megatech::debug_assertion(std::source_location::current(), (exp), (#exp)))
   #define MEGATECH_PRECONDITION_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
   #define MEGATECH_PRECONDITION(exp) MEGATECH_ASSERT_MSG((exp), (#exp))
   #define MEGATECH_POSTCONDITION_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
@@ -327,27 +325,47 @@
 namespace megatech::internal::base {
 
   /**
-   * @brief Emit a diagnostic message and abort the program.
-   * @details This function sends assertion diagnostics to standard error and aborts the program. It never returns.
-   *          Some effort is made to ensure that this function handles weird cases, but generally you can't expect it
-   *          to work if you're out of memory or standard error is closed.
+   * @brief Emit a diagnostic message containing the failing expression and abort the program.
+   * @details This function is thread-safe. This means that when an assertion failure occurs on a second thread, while
+   *          processing an assertion on the initial thread, both assertion messages will be collected and output
+   *          before aborting the program.
    * @param location The location at which the program failed.
-   * @param message A diagnostic message formatted as a NUL-terminated string. This function takes ownership of the
-   *                string and is responsible for freeing it.
+   * @param expression A textual representation of the assertion's expression. This can be `nullptr`. If it is not
+   *        `nullptr`, it must be a NUL-terminated string.
    */
   [[noreturn]]
-  void dispatch_assertion_failure(const std::source_location& location, char* const message) noexcept;
+  void dispatch_assertion_failure(const std::source_location& location, const char* expression) noexcept;
 
   /**
-   * @brief Emit a diagnostic message indicating an assertion failed, but the corresponding message couldn't be
-   *        written.
-   * @details This function is called whenever an error occurs in assertion processing. Basically, it should never
-   *          happen. However, if an invalid format is used or the system is out of memory this will attempt to provide
-   *          some information nonetheless. This function never returns
+   * @brief Emit a diagnostic message containing the failing expression and abort the program.
+   * @details This function is thread-safe. This means that when an assertion failure occurs on a second thread, while
+   *          processing an assertion on the initial thread, both assertion messages will be collected and output
+   *          before aborting the program.
    * @param location The location at which the program failed.
+   * @param expression A textual representation of the assertion's expression. This can be `nullptr`. If it is not
+   *        `nullptr`, it must be a NUL-terminated string.
+   * @param message A message to output explaining the assertion failure. This can be `nullptr`. If it is not
+   *                `nullptr`, it must be a NUL-terminated string.
    */
   [[noreturn]]
-  void dispatch_assertion_error(const std::source_location& location) noexcept;
+  void dispatch_assertion_failure_with_message(const std::source_location& location, const char* expression,
+                                               const char* message) noexcept;
+
+  /**
+   * @brief Attempt to recover from an error during an assertion failure.
+   * @details This is called whenever an error occurs while processing a failed assertion. Some errors are probably
+   *          unrecoverable, but this still attempts to write as much information as it can to standard error. This
+   *          function is not thread-safe. That means that it will not attempt to collect assertion failures occurring
+   *          in parallel. Instead, it simply writes to standard error and immediately aborts the program.
+   * @param location The location at which the program failed.
+   * @param expression A textual representation of the assertion's expression. This can be `nullptr`. If it is not
+   *        `nullptr`, it must be a NUL-terminated string.
+   * @param error An error message explaining what kind of error occurred. This can be `nullptr`. If it is not
+   *             `nullptr`, it must be a NUL-terminated string.
+   */
+  [[noreturn]]
+  void dispatch_assertion_failure_with_error(const std::source_location& location, const char* expression,
+                                             const char* error) noexcept;
 
 #ifdef MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
   /**
@@ -355,13 +373,12 @@ namespace megatech::internal::base {
    * @param location The location at which the assertion is found.
    * @param condition Whether or not the assertion passed. If this is false the program will be aborted with a
    *                  diagnostic.
+   * @param expression A textual representation of the assertion's expression.
    * @param format The format of the diagnostic message associated with the assertion.
-   * @param message_size The size of the formatted message without a NUL-terminator.
    * @param args A type-erased collection of format arguments.
    */
-  void debug_assertion_format(const std::source_location& location, const bool condition,
-                              const std::string_view& format, const std::size_t message_size,
-                              std::format_args&& args) noexcept;
+  void debug_assertion_format(const std::source_location& location, const bool condition, const char *const expression,
+                              const std::string_view& format, std::format_args&& args) noexcept;
 #endif
 
 }
@@ -370,15 +387,28 @@ namespace megatech::internal::base {
 namespace megatech {
 
   /**
+   * @brief Process an assertion without a formatted message.
+   * @details This is the safest assetion function. It has minimal potential for failure even if a thoroughly broken
+   *          program.
+   * @param location The location at which the assertion is found.
+   * @param condition Whether or not the assertion passed. If this is false the program will be aborted with a
+   *                  diagnostic.
+   * @param expression A textual representation of the assertion's expression.
+   */
+  void debug_assertion(const std::source_location& location, const bool condition,
+                       const char *const expression) noexcept;
+
+  /**
    * @brief Process an assertion using the "printf"-style formatting syntax.
    * @param location The location at which the assertion is found.
    * @param condition Whether or not the assertion passed. If this is false the program will be aborted with a
    *                  diagnostic.
+   * @param expression A textual representation of the assertion's expression.
    * @param format The format of the diagnostic message associated with the assertion.
    * @param ... 0 or more formatting arguments to use when rendering the diagnostic message.
    */
   void debug_assertion_printf(const std::source_location& location, const bool condition,
-                              const char *const format, ...) noexcept;
+                              const char *const expression, const char *const format, ...) noexcept;
 
 #ifdef MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
   /**
@@ -386,21 +416,15 @@ namespace megatech {
    * @param location The location at which the assertion is found.
    * @param condition Whether or not the assertion passed. If this is false the program will be aborted with a
    *                  diagnostic.
+   * @param expression A textual representation of the assertion's expression.
    * @param format The format of the diagnostic message associated with the assertion.
    * @param args 0 or more formatting arguments to use when rendering the diagnostic message.
    */
   template <typename... Args>
-  void debug_assertion_format(const std::source_location& location, const bool condition,
+  void debug_assertion_format(const std::source_location& location, const bool condition, const char *const expression,
                               const std::format_string<Args...>& format, Args&&... args) noexcept {
-    try
-    {
-      const auto size = std::formatted_size(format, std::forward<Args>(args)...);
-      internal::base::debug_assertion_format(location, condition, format.get(), size, std::make_format_args(args...));
-    }
-    catch (...)
-    {
-      internal::base::dispatch_assertion_error(location);
-    }
+    using internal::base::debug_assertion_format;
+    debug_assertion_format(location, condition, expression, format.get(), std::make_format_args(args...));
   }
 #endif
 

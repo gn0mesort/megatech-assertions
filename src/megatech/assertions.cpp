@@ -7,70 +7,246 @@
  */
 #include "megatech/assertions.hpp"
 
+#include "config.hpp"
+
 #include <cinttypes>
 #include <cstdio>
 #include <cstdlib>
 #include <cstdarg>
 
-#define MEGATECH_ASSERTION_FAILURE_FORMATTER ("%s:%" PRIu32 ": An assertion failed with the message \"%s\".\n")
-#define MEGATECH_ASSERTION_ERROR_FORMATTER \
-  ("%s:%" PRIu32 ": An assertion failed, but its message could not be formatted.\n")
+#include <array>
+#include <iterator>
+
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+  #define MEGATECH_ASSERTIONS_PT_DECL static thread_local
+
+  #include <mutex>
+  #include <condition_variable>
+#else
+  #define MEGATECH_ASSERTIONS_PT_DECL static
+#endif
+
+
+namespace {
+
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+  static std::mutex sg_mtx{ };
+  static std::condition_variable sg_condition{ };
+  static std::size_t sg_unresolved_failures{ 0 };
+#endif
+
+#if CONFIG_ASSERTION_BUFFER_CHAR_SIZE
+  // A per-thread buffer for formatted assertion messages.
+  // Creating lots of threads, therefore, will consume a considerable amount of memory if this is very large.
+  // The default size is 4001 characters (i.e., enough for 1000 4-byte UTF-8 code points and a NUL terminator) or
+  // roughly 4KiB. If this memory cost is an issue you should tune the library configuration to meet your needs.
+  // If either CONFIG_ASSERTION_BUFFER_SIZE or CONFIG_MAX_CODE_POINT_SIZE are 0, then this is disabled.
+  MEGATECH_ASSERTIONS_PT_DECL std::array<char, CONFIG_ASSERTION_BUFFER_CHAR_SIZE> pt_assertion_buffer{ };
+
+  // This is a truncating output iterator type. Basically, it writes into a buffer until some size has been exceeded.
+  // After that, the incoming output is simply discarded. This behaves similiarly to types like
+  // std::back_insert_iterator.
+  template <typename Type>
+  class truncating_iterator final {
+  public:
+    using difference_type = std::ptrdiff_t;
+    using value_type = void;
+    using pointer = void;
+    using reference = void;
+    using iterator_category = std::output_iterator_tag;
+  private:
+    std::size_t m_size{ };
+    std::size_t m_current{ };
+    Type* m_data{ };
+  public:
+    constexpr truncating_iterator(Type *const data, const std::size_t size) : m_size{ size }, m_data{ data } { }
+    constexpr truncating_iterator(const truncating_iterator& other) = default;
+    constexpr truncating_iterator(truncating_iterator&& other) = default;
+
+    constexpr ~truncating_iterator() noexcept = default;
+
+    constexpr truncating_iterator& operator=(const truncating_iterator& rhs) = default;
+    constexpr truncating_iterator& operator=(truncating_iterator&& rhs) = default;
+    constexpr truncating_iterator& operator=(const Type& rhs) {
+      if (m_current < m_size)
+      {
+        m_data[m_current++] = rhs;
+      }
+      return *this;
+    }
+
+    constexpr truncating_iterator& operator++() {
+      return *this;
+    }
+
+    constexpr truncating_iterator operator++(int) {
+      return *this;
+    }
+
+    constexpr truncating_iterator& operator*() {
+      return *this;
+    }
+  };
+#endif
+
+}
 
 namespace megatech::internal::base {
 
-  void dispatch_assertion_failure(const std::source_location& location, char* const message) noexcept {
-      // std::fprintf can, of course, fail. However, if this happens we are so screwed that it's not recoverable here.
-      const auto res = std::fprintf(stderr, MEGATECH_ASSERTION_FAILURE_FORMATTER, location.file_name(),
-                                    location.line(), message);
-      std::free(message);
-      [[unlikely]] if (res < 0)
+#if CONFIG_ASSERTION_BUFFER_CHAR_SIZE
+  void dispatch_assertion_failure_with_message(const std::source_location& location, const char* expression,
+                                               const char* message) noexcept {
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+      try
+#endif
       {
-        // This is really the best I can do. If there was an error then, perhaps, perror will still function as
-        // intended. Realistically, if you're in a scenario where you can't write to stderr (and you haven't
-        // purposefully closed it) things are pretty bad.
-        std::perror("megatech-assertions");
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+        {
+          auto lock = std::lock_guard<std::mutex>{ sg_mtx };
+          // We're in the middle of resolving the assertion.
+          ++sg_unresolved_failures;
+        }
+#endif
+        // If the caller didn't provide an expression, it should be an empty string.
+        if (!expression)
+        {
+          expression = "";
+        }
+        if (!message)
+        {
+          message = "";
+        }
+        {
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+          auto lock = std::lock_guard<std::mutex>{ sg_mtx };
+#endif
+          std::fprintf(stderr, "%s:%" PRIu32 ": The assertion \"%s\" failed with the message \"%s\".\n",
+                       location.file_name(), location.line(), expression, message);
+        }
       }
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+      catch (...)
+      {
+        dispatch_assertion_failure_with_error(location, expression, "A concurrency error occurred while processing an "
+                                                                    "assertion failure. Locking the assertion mutex "
+                                                                    "may have failed.");
+      }
+      try
+      {
+        {
+          // Although the lock could be released before notifying, it isn't maximally safe. Assertions aren't a
+          // performance feature. The program is about to fail hard, so this is fine.
+          auto lock = std::lock_guard<std::mutex>{ sg_mtx };
+          if (sg_unresolved_failures == 1)
+          {
+            // Notifying will wake up all waiting threads. Then they will immediately block on the lock that they can't
+            // acquire.
+            sg_condition.notify_all();
+          }
+          // The assertion is resolved.
+          --sg_unresolved_failures;
+        }
+        // Wait for any pending assertions to resolve.
+        auto lock = std::unique_lock<std::mutex>{ sg_mtx };
+        sg_condition.wait(lock, [](){ return !sg_unresolved_failures; });
+      }
+      // Ignore post-processing errors, just abort.
+      catch (...) { }
+#endif
+      std::abort();
+  }
+#endif
+
+  void dispatch_assertion_failure(const std::source_location& location, const char* expression) noexcept {
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+      try
+#endif
+      {
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+        {
+          auto lock = std::lock_guard<std::mutex>{ sg_mtx };
+          ++sg_unresolved_failures;
+        }
+#endif
+        if (!expression)
+        {
+          expression = "";
+        }
+        {
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+          auto lock = std::lock_guard<std::mutex>{ sg_mtx };
+#endif
+          std::fprintf(stderr, "%s:%" PRIu32 ": The assertion \"%s\" failed.\n", location.file_name(), location.line(),
+                       expression);
+        }
+      }
+#ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
+      catch (...)
+      {
+        dispatch_assertion_failure_with_error(location, expression, "A concurrency error occurred while processing an "
+                                                                    "assertion failure. Llocking the assertion mutex "
+                                                                    "may have failed.");
+      }
+      try
+      {
+        {
+          auto lock = std::lock_guard<std::mutex>{ sg_mtx };
+          if (sg_unresolved_failures == 1)
+          {
+            sg_condition.notify_all();
+          }
+          --sg_unresolved_failures;
+        }
+        auto lock = std::unique_lock<std::mutex>{ sg_mtx };
+        sg_condition.wait(lock, [](){ return !sg_unresolved_failures; });
+      }
+      catch (...) { }
+#endif
       std::abort();
   }
 
-  void dispatch_assertion_error(const std::source_location& location) noexcept {
-    const auto res = std::fprintf(stderr, MEGATECH_ASSERTION_ERROR_FORMATTER, location.file_name(), location.line());
-    [[unlikely]] if (res < 0)
+  void dispatch_assertion_failure_with_error(const std::source_location& location, const char* expression,
+                                             const char* error) noexcept {
+    if (!expression)
     {
-      std::perror("megatech-assertions");
+      expression = "";
     }
+    if (!error)
+    {
+      error = "";
+    }
+    std::fprintf(stderr, "%s:%" PRIu32 ": The assertion \"%s\" failed.\nThe following error occurred during assertion "
+                         "failure processing: \"%s\"\n", location.file_name(), location.line(), expression, error);
     std::abort();
   }
 
 #ifdef MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
-  void debug_assertion_format(const std::source_location& location, const bool condition,
-                              const std::string_view& format, const std::size_t message_size,
-                              std::format_args&& args) noexcept {
+  void debug_assertion_format(const std::source_location& location, const bool condition, const char *const expression,
+                              const std::string_view& format, std::format_args&& args) noexcept {
+// If the assertion buffer is disabled, immediately defer to a bufferless assertion.
+#if CONFIG_ASSERTION_BUFFER_CHAR_SIZE
     if (!condition)
     {
-      auto message = static_cast<char*>(nullptr);
       try
       {
-        // The reason to do this is to ensure that there is exactly one call for printing messages.
-        // Although std::string is "safer" this is a trivial memory operation.
-        // internal::base::dispatch_assertion_failure will always call std::free(message).
-        message = reinterpret_cast<char*>(std::calloc(message_size + 1, sizeof(char)));
-        [[unlikely]] if (!message)
-        {
-          dispatch_assertion_error(location);
-        }
-        std::vformat_to(&message[0], format, args);
-        dispatch_assertion_failure(location, message);
+        std::vformat_to(truncating_iterator<char>{ pt_assertion_buffer.data(), pt_assertion_buffer.size() - 1 },
+                        format, args);
+      }
+      catch (const std::format_error& err)
+      {
+        dispatch_assertion_failure_with_error(location, expression, "A formatting error occurred.");
       }
       catch (...)
       {
-        if (message)
-        {
-          std::free(message);
-        }
-        dispatch_assertion_error(location);
+        dispatch_assertion_failure_with_error(location, expression, "An unknown error occurred while formatting.");
       }
+      dispatch_assertion_failure_with_message(location, expression, pt_assertion_buffer.data());
     }
+#else
+    (void) format;
+    (void) args;
+    debug_assertion(location, condition, expression);
+#endif
   }
 #endif
 
@@ -78,41 +254,33 @@ namespace megatech::internal::base {
 
 namespace megatech {
 
-  void debug_assertion_printf(const std::source_location& location, const bool condition,
-                              const char *const format, ...) noexcept {
+  void debug_assertion(const std::source_location& location, const bool condition,
+                       const char *const expression) noexcept {
     if (!condition)
     {
-      // va_lists require this declaration style specifically.
-      std::va_list args;
-      // Calculate and allocate space for message.
-      va_start(args, format);
-      std::va_list args_cp;
-      // The next call will destroy args so we need another copy.
-      va_copy(args_cp, args);
-      const auto sz = std::vsnprintf(nullptr, 0, format, args);
-      if (sz < 0)
-      {
-        va_end(args);
-        va_end(args_cp);
-        internal::base::dispatch_assertion_error(location);
-      }
-      va_end(args);
-      // +1 for the null terminator
-      auto message = reinterpret_cast<char*>(std::calloc(sz + 1, sizeof(char)));
-      if (!message)
-      {
-        va_end(args_cp);
-        internal::base::dispatch_assertion_error(location);
-      }
-      if (auto res = std::vsnprintf(message, sz + 1, format, args_cp); res < 0)
-      {
-        va_end(args_cp);
-        std::free(message);
-        internal::base::dispatch_assertion_error(location);
-      }
-      va_end(args_cp);
-      internal::base::dispatch_assertion_failure(location, message);
+      internal::base::dispatch_assertion_failure(location, expression);
     }
+  }
+
+  void debug_assertion_printf(const std::source_location& location, const bool condition, const char *const expression,
+                              const char *const format, ...) noexcept {
+#if CONFIG_ASSERTION_BUFFER_CHAR_SIZE
+    if (!condition)
+    {
+      std::va_list args;
+      va_start(args, format);
+      const auto res = std::vsnprintf(pt_assertion_buffer.data(), pt_assertion_buffer.size(), format, args);
+      va_end(args);
+      if (res <= 0)
+      {
+        internal::base::dispatch_assertion_failure_with_error(location, expression, "A formatting error occurred.");
+      }
+      internal::base::dispatch_assertion_failure_with_message(location, expression, pt_assertion_buffer.data());
+    }
+#else
+    (void) format;
+    debug_assertion(location, condition, expression);
+#endif
   }
 
 }

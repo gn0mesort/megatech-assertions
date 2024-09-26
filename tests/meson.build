@@ -2,32 +2,82 @@ pymod = import('python')
 python3 = pymod.find_installation('python3')
 runner = find_program('test-runner.py')
 args = [ '-UNDEBUG' ]
+buffer_size = get_option('max_code_point_size') * get_option('assertion_buffer_size')
+max_test_threads = 25
+buffer = [ ]
+foreach i : range(buffer_size)
+  buffer += 'a'
+endforeach
+test_truncation_result = '"@0@"'.format(''.join(buffer))
+foreach i : range(100)
+  buffer += 'b'
+endforeach
+test_parallel_assert_msg_fail_results = [ ]
 dependencies = [ megatech_assertions_dep ]
+config = configuration_data()
+config.set_quoted('CONFIG_TEST_TRUNCATION_STRING', ''.join(buffer))
+config.set('CONFIG_TEST_MAX_THREADS', max_test_threads)
+config_header = configure_file(configuration: config, input: files('generated/config.hpp'), output: 'config.hpp')
+test_assert_msg_fail_exe = disabler()
+test_assert_msg_fail_printf_exe = disabler()
+test_parallel_assert_msg_fail_exe = disabler()
+test_truncate_assert_msg_fail_printf_exe = disabler()
+if buffer_size > 0
+  test_assert_msg_fail_exe = executable('test-assert-msg-fail', files('test_assert_msg_fail.cpp'),
+                                        dependencies: dependencies, cpp_args: args)
+  test_assert_msg_fail_printf_exe = executable('test-assert-msg-fail-printf', files('test_assert_msg_fail_printf.cpp'),
+                                               dependencies: dependencies, cpp_args: args)
+  if get_option('thread_safe_assertions').allowed() and max_test_threads > 1
+    test_parallel_assert_msg_fail_exe = executable('test-parallel-assert-msg-fail',
+                                                   [ config_header, files('test_parallel_assert_msg_fail.cpp') ],
+                                                   dependencies: dependencies, cpp_args: args)
+    foreach i : range(max_test_threads)
+      test_parallel_assert_msg_fail_results += '"Thread @0@"'.format(i)
+    endforeach
+  endif
+  test_truncate_assert_msg_fail_printf_exe = executable('test-truncate-assert-msg-fail-printf',
+                                                        [ config_header,
+                                                          files('test_truncate_assert_msg_fail_printf.cpp') ],
+                                                        dependencies: dependencies, cpp_args: args)
+endif
 test_assert_fail_exe = executable('test-assert-fail', files('test_assert_fail.cpp'),
                                   dependencies: dependencies, cpp_args: args)
 test_assert_pass_exe = executable('test-assert-pass', files('test_assert_pass.cpp'),
                                   dependencies: dependencies, cpp_args: args)
-test_assert_msg_fail_exe = executable('test-assert-msg-fail', files('test_assert_msg_fail.cpp'),
-                                      dependencies: dependencies, cpp_args: args)
-test_assert_msg_fail_printf_exe = executable('test-assert-msg-fail-printf', files('test_assert_msg_fail_printf.cpp'),
-                                             dependencies: dependencies, cpp_args: args)
 test_assert_msg_fail_format_exe = disabler()
 test_assert_msg_fail_disable_format_exe = disabler()
-if meson.get_compiler('cpp').has_header('format')
+test_truncate_assert_msg_fail_format_exe = disabler()
+test_assert_msg_fail_format_error_exe = disabler()
+if meson.get_compiler('cpp').has_header('format') and buffer_size > 0
   test_assert_msg_fail_format_exe = executable('test-assert-msg-fail-format', files('test_assert_msg_fail_format.cpp'),
                                                dependencies: dependencies, cpp_args: args)
   test_assert_msg_fail_disable_format_exe = executable('test-assert-msg-fail-disable-format',
                                                        files('test_assert_msg_fail_disable_format.cpp'),
                                                        dependencies: dependencies, cpp_args: args)
+  test_truncate_assert_msg_fail_format_exe = executable('test-truncate-assert-msg-fail-format',
+                                                        [ config_header,
+                                                          files('test_truncate_assert_msg_fail_format.cpp') ],
+                                                        dependencies: dependencies, cpp_args: args)
+  test_assert_msg_fail_format_error_exe = executable('test-assert-msg-fail-format-error',
+                                                     files('test_assert_msg_fail_format_error.cpp'),
+                                                     dependencies: dependencies, cpp_args: args)
 endif
 test_disable_assertions_exe = executable('test-disable-assertions', files('test_disable_assertions.cpp'),
                                          dependencies: dependencies, cpp_args: args)
-test('Assertion Failure', runner, args: [ test_assert_fail_exe.full_path(), '1 != 1' ])
+test('Assertion Failure', runner, args: [ test_assert_fail_exe.full_path(), '"1 != 1"' ])
 test('Assertion Pass', runner, args: [ '--expect-success', test_assert_pass_exe.full_path() ])
-test('Assertion Failure with Message', runner, args: [ test_assert_msg_fail_exe.full_path(), 'test passed' ])
+test('Assertion Failure with Message', runner, args: [ test_assert_msg_fail_exe.full_path(), '"test passed"' ])
 test('Assertion Failure with Message and "printf" Formatting', runner,
-     args: [ test_assert_msg_fail_printf_exe.full_path(), 'test passed' ])
+     args: [ test_assert_msg_fail_printf_exe.full_path(), '"test passed"' ])
 test('Assertion Failure with Message and "format" Formatting', runner,
-     args: [ test_assert_msg_fail_format_exe.full_path(), 'test passed' ])
-test('Disable "format" Formatting', runner, args: [ test_assert_msg_fail_disable_format_exe.full_path(), 'test {}' ])
+     args: [ test_assert_msg_fail_format_exe.full_path(), '"test passed"' ])
+test('Disable "format" Formatting', runner, args: [ test_assert_msg_fail_disable_format_exe.full_path(), '"test {}"' ])
 test('Disable Assertions', runner, args: [ '--expect-success', test_disable_assertions_exe.full_path() ])
+test('Parallel Assertions', runner,
+     args: [ '--retry=5', test_parallel_assert_msg_fail_exe.full_path(), test_parallel_assert_msg_fail_results ])
+test('Truncate Assertion Messages with "printf" Formatting', runner,
+     args: [ test_truncate_assert_msg_fail_printf_exe.full_path(), test_truncation_result ])
+test('Truncate Assertion Messages with "format" Formatting', runner,
+     args: [ test_truncate_assert_msg_fail_format_exe.full_path(), test_truncation_result ])
+test('Error During Assertion Failure', runner, args: [ test_assert_msg_fail_format_error_exe.full_path(),
+                                                       'The following error' ])

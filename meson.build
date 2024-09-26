@@ -14,8 +14,14 @@ project(
   ]
 )
 includes = [ include_directories('include') ]
-sources = [ files('src/megatech/assertions.cpp') ]
-
+config = configuration_data()
+config.set('CONFIG_MAX_CODE_POINT_SIZE', get_option('max_code_point_size'))
+config.set('CONFIG_ASSERTION_BUFFER_SIZE', get_option('assertion_buffer_size'))
+if get_option('thread_safe_assertions').allowed()
+  config.set('CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED', 1)
+endif
+config_header = configure_file(configuration: config, input: files('generated/config.hpp'), output: 'config.hpp')
+sources = [ config_header, files('src/megatech/assertions.cpp') ]
 megatech_assertions_lib = library(meson.project_name(), sources, include_directories: includes,
                                   version: meson.project_version())
 megatech_assertions_dep = declare_dependency(link_with: megatech_assertions_lib, include_directories: includes)
