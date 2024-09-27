@@ -13,6 +13,7 @@ project(
     'default_library=static'
   ]
 )
+description = 'Megatech Assertion Library'
 includes = [ include_directories('include') ]
 config = configuration_data()
 config.set('CONFIG_MAX_CODE_POINT_SIZE', get_option('max_code_point_size'))
@@ -23,8 +24,12 @@ endif
 config_header = configure_file(configuration: config, input: files('generated/config.hpp'), output: 'config.hpp')
 sources = [ config_header, files('src/megatech/assertions.cpp') ]
 megatech_assertions_lib = library(meson.project_name(), sources, include_directories: includes,
-                                  version: meson.project_version())
+                                  version: meson.project_version(), install: true)
 megatech_assertions_dep = declare_dependency(link_with: megatech_assertions_lib, include_directories: includes)
+install_headers(files('include/megatech/assertions.hpp'), install_dir: 'include/megatech')
+pkgconfig = import('pkgconfig')
+pkgconfig.generate(megatech_assertions_lib, url: 'https://github.com/gn0mesort/megatech-assertions',
+                   description: description)
 if get_option('tests').allowed()
   subdir('tests')
 endif
