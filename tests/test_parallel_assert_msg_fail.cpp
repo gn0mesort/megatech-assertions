@@ -6,7 +6,7 @@
 
 #include "config.hpp"
 
-std::barrier ready{ CONFIG_TEST_MAX_THREADS };
+std::barrier ready{ CONFIG_TEST_MAX_THREADS + 1 };
 
 void worker(const int i) {
   ready.arrive_and_wait();
@@ -19,5 +19,6 @@ int main() {
   {
     threads.emplace_back(worker, i);
   }
+  ready.arrive_and_wait();
   return 0;
 }
