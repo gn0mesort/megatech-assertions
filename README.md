@@ -48,7 +48,7 @@ source .venv/bin/activate
 Finally, to install Meson and Ninja you would run:
 
 ```sh
-python3 -m pip install -r requirements.txth
+python3 -m pip install -r requirements.txt
 ```
 
 ## Configuring the Build System
@@ -75,7 +75,7 @@ meson configure build -Ddefault_library=dynamic
 ```
 
 Second, Megatech Assertions will attempt to use thread-safe assertions by default. This behavior creates more points
-of failure, but helps to ensure that multiple assertion failures across parallel processes are reported before the
+of failure, but helps to ensure that multiple assertion failures across parallel thread are reported before the
 program aborts. To disable this behavior run:
 
 ```sh
@@ -176,14 +176,14 @@ features, you can select the desired behavior specifically. To explicitly use `p
 
 ## Thread Safety
 
-The Megatech Assertions library attempts to be thread safe. This means that it should capture assertion failures
+The Megatech Assertions library attempts to be thread-safe. This means that it should capture assertion failures
 across parallel threads. If two assertions fail relatively simultaneous a diagnostic message should be written to
-standard error for each failure. Afterwards, the program aborts as normal. Thread safe assertions are enabled by
-default, but they can be disabled at compile time. When thread safe assertions are disabled the library will
+standard error for each failure. Afterwards, the program aborts as normal. Thread-safe assertions are enabled by
+default, but they can be disabled at compile time. When thread-safe assertions are disabled the library will
 immediately print its diagnostic and abort regardless of other threads.
 
-Due to the buffer used for assertion message formatting, thread safe assertions require one message buffer per thread.
-If the memory footprint of this is undesirable, you can disable either the buffer or thread safe assertions.
+Due to the buffer used for assertion message formatting, thread-safe assertions can require one significant memory.
+If the memory footprint of this is undesirable, you can disable either the buffer or thread-safe assertions.
 
 ## Possible Points of Failure
 
@@ -200,3 +200,5 @@ meson configure build -Dthread_safe_assertions=disabled -Dassertion_buffer_size=
 This will leave only one point of failure: diagnostic reporting. Very little can be done if the library can't write
 to standard error, so this is silently ignored. Regardless of errors, the library always calls `std::abort()` on an
 assertion failure.
+
+Further usage information is provided in the HTML documentation.
