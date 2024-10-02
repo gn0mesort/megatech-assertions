@@ -64,6 +64,21 @@ if meson.get_compiler('cpp').has_header('format') and buffer_size > 0
 endif
 test_disable_assertions_exe = executable('test-disable-assertions', files('test_disable_assertions.cpp'),
                                          dependencies: dependencies, cpp_args: args)
+test_exact_assert_fail_exe = executable('test-exact-assert-fail', files('test_exact_assert_fail.cpp'),
+                                        dependencies: dependencies, cpp_args: args)
+test_exact_assert_msg_fail_exe = executable('test-exact-assert-msg-fail', files('test_exact_assert_msg_fail.cpp'),
+                                        dependencies: dependencies, cpp_args: args)
+test_precondition_is_assert_exe = executable('test-precondition-is-assert', files('test_precondition_is_assert.cpp'),
+                                             dependencies: dependencies, cpp_args: args)
+test_precondition_msg_is_assert_msg_exe = executable('test-precondition-msg-is-assert-msg',
+                                                     files('test_precondition_msg_is_assert_msg.cpp'),
+                                                     dependencies: dependencies, cpp_args: args)
+test_postcondition_is_assert_exe = executable('test-postcondition-is-assert',
+                                              files('test_postcondition_is_assert.cpp'),
+                                              dependencies: dependencies, cpp_args: args)
+test_postcondition_msg_is_assert_msg_exe = executable('test-postcondition-msg-is-assert-msg',
+                                                      files('test_postcondition_msg_is_assert_msg.cpp'),
+                                                      dependencies: dependencies, cpp_args: args)
 test('Assertion Failure', runner, args: [ test_assert_fail_exe.full_path(), '"1 != 1"' ])
 test('Assertion Pass', runner, args: [ '--expect-success', test_assert_pass_exe.full_path() ])
 test('Assertion Failure with Message', runner, args: [ test_assert_msg_fail_exe.full_path(), '"test passed"' ])
@@ -81,3 +96,22 @@ test('Truncate Assertion Messages with "format" Formatting', runner,
      args: [ test_truncate_assert_msg_fail_format_exe.full_path(), test_truncation_result ])
 test('Error During Assertion Failure', runner, args: [ test_assert_msg_fail_format_error_exe.full_path(),
                                                        'The following error' ])
+# These are brittle. If they break, double check that the output hasn't changed for some reason.
+test('Exact Assertion Match', runner,
+     args: [ '--exact', test_exact_assert_fail_exe.full_path(),
+             '../tests/test_exact_assert_fail.cpp:4: The assertion "1 != 1" failed.\n' ])
+test('Exact Assertion Match with Message', runner,
+     args: [ '--exact', test_exact_assert_msg_fail_exe.full_path(),
+             '../tests/test_exact_assert_msg_fail.cpp:4: The assertion "1 != 1" failed with the message "test passed".\n' ])
+test('Precondition is Assertion', runner,
+     args: [ '--exact', test_precondition_is_assert_exe.full_path(),
+             '../tests/test_precondition_is_assert.cpp:4: The assertion "1 != 1" failed.\n' ])
+test('Precondition with Message is Assertion with Message', runner,
+     args: [ '--exact', test_precondition_msg_is_assert_msg_exe.full_path(),
+             '../tests/test_precondition_msg_is_assert_msg.cpp:4: The assertion "1 != 1" failed with the message "test passed".\n' ])
+test('Postcondition is Assertion', runner,
+     args: [ '--exact', test_postcondition_is_assert_exe.full_path(),
+             '../tests/test_postcondition_is_assert.cpp:4: The assertion "1 != 1" failed.\n' ])
+test('Postcondition with Message is Assertion with Message', runner,
+     args: [ '--exact', test_postcondition_msg_is_assert_msg_exe.full_path(),
+             '../tests/test_postcondition_msg_is_assert_msg.cpp:4: The assertion "1 != 1" failed with the message "test passed".\n' ])
