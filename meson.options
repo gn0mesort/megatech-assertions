@@ -1,0 +1,11 @@
+option('tests', type: 'feature', value: 'disabled', description: 'Build unit tests. Disabled by default.', yield: true)
+option('enabled_doxygen_sections', type: 'array', value: [],
+       description: 'Extra sections, on top of the default, to enable when generating documentation.', yield: true)
+option('max_code_point_size', type: 'integer', min: 0, value: 4,
+       description: 'The size of code points in assertion messages. Setting this to 0 will disable assertion ' +
+                    'messages. Defaults to 4 (i.e., 1 UTF-8 code point)')
+option('assertion_buffer_size', type: 'integer', min: 0, value: 1000,
+       description: 'The size of each thread_local assertion message buffer in code points. Setting this to 0 will ' +
+                    'disable assertion messages. Defaults to 1000.')
+option('thread_safe_assertions', type: 'feature', value: 'enabled',
+       description: 'Use thread-safe assertions. Enabled by default.')
