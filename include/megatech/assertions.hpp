@@ -280,27 +280,27 @@
   #define MEGATECH_ASSERT_MSG_PRINTF(exp, msg, ...) \
     (megatech::debug_assertion_printf(std::source_location::current(), (exp), (#exp), (msg) __VA_OPT__(,) __VA_ARGS__))
   #define MEGATECH_PRECONDITION_MSG_PRINTF(exp, msg, ...) \
-    MEGATECH_ASSERT_MSG_PRINTF((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
+    MEGATECH_ASSERT_MSG_PRINTF(exp, msg __VA_OPT__(,) __VA_ARGS__)
   #define MEGATECH_POSTCONDITION_MSG_PRINTF(exp, msg, ...) \
-    MEGATECH_ASSERT_MSG_PRINTF((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
+    MEGATECH_ASSERT_MSG_PRINTF(exp, msg __VA_OPT__(,) __VA_ARGS__)
   #ifdef MEGATECH_ASSERTIONS_FORMAT_AVAILABLE
     #define MEGATECH_ASSERT_MSG_FORMAT(exp, msg, ...) \
       (megatech::debug_assertion_format(std::source_location::current(), (exp), (#exp), (msg) __VA_OPT__(,) __VA_ARGS__))
     #define MEGATECH_PRECONDITION_MSG_FORMAT(exp, msg, ...) \
-      MEGATECH_ASSERT_MSG_FORMAT((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
+      MEGATECH_ASSERT_MSG_FORMAT(exp, msg __VA_OPT__(,) __VA_ARGS__)
     #define MEGATECH_POSTCONDITION_MSG_FORMAT(exp, msg, ...) \
-      MEGATECH_ASSERT_MSG_FORMAT((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
+      MEGATECH_ASSERT_MSG_FORMAT(exp, msg __VA_OPT__(,) __VA_ARGS__)
   #endif
   #if defined(MEGATECH_ASSERTIONS_DEFAULT_FORMATTER_PRINTF)
-    #define MEGATECH_ASSERT_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG_PRINTF((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
+    #define MEGATECH_ASSERT_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG_PRINTF(exp, msg __VA_OPT__(,) __VA_ARGS__)
   #elif defined(MEGATECH_ASSERTIONS_DEFAULT_FORMATTER_FORMAT)
-    #define MEGATECH_ASSERT_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG_FORMAT((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
+    #define MEGATECH_ASSERT_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG_FORMAT(exp, msg __VA_OPT__(,) __VA_ARGS__)
   #endif
   #define MEGATECH_ASSERT(exp) (megatech::debug_assertion(std::source_location::current(), (exp), (#exp)))
-  #define MEGATECH_PRECONDITION_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
-  #define MEGATECH_PRECONDITION(exp) MEGATECH_ASSERT_MSG((exp), (#exp))
-  #define MEGATECH_POSTCONDITION_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG((exp), (msg) __VA_OPT__(,) __VA_ARGS__)
-  #define MEGATECH_POSTCONDITION(exp) MEGATECH_ASSERT_MSG((exp), (#exp))
+  #define MEGATECH_PRECONDITION_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG(exp, msg __VA_OPT__(,) __VA_ARGS__)
+  #define MEGATECH_PRECONDITION(exp) MEGATECH_ASSERT(exp)
+  #define MEGATECH_POSTCONDITION_MSG(exp, msg, ...) MEGATECH_ASSERT_MSG(exp, msg __VA_OPT__(,) __VA_ARGS__)
+  #define MEGATECH_POSTCONDITION(exp) MEGATECH_ASSERT(exp)
 #else
   #define MEGATECH_ASSERT(exp) ((void) 0)
   #define MEGATECH_ASSERT_MSG(exp, msg, ...) ((void) 0)
