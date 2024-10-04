@@ -1,7 +1,7 @@
 project(
   'megatech-assertions',
   [ 'cpp' ],
-  version: '1.0.0',
+  version: '1.0.1',
   license: 'AGPL-3.0-or-later',
   license_files: [ 'LICENSE' ],
   default_options: [
