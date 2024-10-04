@@ -26,6 +26,9 @@
   #define MEGATECH_ASSERTIONS_PT_DECL static
 #endif
 
+// This is the prefix format for assertion diagnostics.
+// It needs to contain the file name, line number, and procedure name at the location where an assertion failed.
+#define PREFIX_FORMAT "%s:%" PRIu32 ": %s: "
 
 namespace {
 
@@ -120,8 +123,8 @@ namespace megatech::internal::base {
 #ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
           auto lock = std::lock_guard<std::mutex>{ sg_mtx };
 #endif
-          std::fprintf(stderr, "%s:%" PRIu32 ": The assertion \"%s\" failed with the message \"%s\".\n",
-                       location.file_name(), location.line(), expression, message);
+          std::fprintf(stderr, PREFIX_FORMAT "The assertion \"%s\" failed with the message \"%s\".\n",
+                       location.file_name(), location.line(), location.function_name(), expression, message);
         }
       }
 #ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
@@ -176,8 +179,8 @@ namespace megatech::internal::base {
 #ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
           auto lock = std::lock_guard<std::mutex>{ sg_mtx };
 #endif
-          std::fprintf(stderr, "%s:%" PRIu32 ": The assertion \"%s\" failed.\n", location.file_name(), location.line(),
-                       expression);
+          std::fprintf(stderr, PREFIX_FORMAT "The assertion \"%s\" failed.\n", location.file_name(), location.line(),
+                       location.function_name(), expression);
         }
       }
 #ifdef CONFIG_THREAD_SAFE_ASSERTIONS_ENABLED
@@ -215,8 +218,9 @@ namespace megatech::internal::base {
     {
       error = "";
     }
-    std::fprintf(stderr, "%s:%" PRIu32 ": The assertion \"%s\" failed.\nThe following error occurred during assertion "
-                         "failure processing: \"%s\"\n", location.file_name(), location.line(), expression, error);
+    std::fprintf(stderr, PREFIX_FORMAT "The assertion \"%s\" failed.\nThe following error occurred during assertion "
+                         "failure processing: \"%s\"\n", location.file_name(), location.line(),
+                 location.function_name(), expression, error);
     std::abort();
   }
 

@@ -100,19 +100,19 @@ path = meson.current_source_dir().replace(meson.source_root(), '..')
 # These are brittle. If they break, double check that the output hasn't changed for some reason.
 test('Exact Assertion Match', runner,
      args: [ '--exact', test_exact_assert_fail_exe.full_path(),
-             '@0@/test_exact_assert_fail.cpp:4: The assertion "1 != 1" failed.\n'.format(path) ])
+             '@0@/test_exact_assert_fail.cpp:4: int main(): The assertion "1 != 1" failed.\n'.format(path) ])
 test('Exact Assertion Match with Message', runner,
      args: [ '--exact', test_exact_assert_msg_fail_exe.full_path(),
-             '@0@/test_exact_assert_msg_fail.cpp:4: The assertion "1 != 1" failed with the message "test passed".\n'.format(path) ])
+             '@0@/test_exact_assert_msg_fail.cpp:4: int main(): The assertion "1 != 1" failed with the message "test passed".\n'.format(path) ])
 test('Precondition is Assertion', runner,
      args: [ '--exact', test_precondition_is_assert_exe.full_path(),
-             '@0@/test_precondition_is_assert.cpp:4: The assertion "1 != 1" failed.\n'.format(path) ])
+             '@0@/test_precondition_is_assert.cpp:4: int main(): The assertion "1 != 1" failed.\n'.format(path) ])
 test('Precondition with Message is Assertion with Message', runner,
      args: [ '--exact', test_precondition_msg_is_assert_msg_exe.full_path(),
-             '@0@/test_precondition_msg_is_assert_msg.cpp:4: The assertion "1 != 1" failed with the message "test passed".\n'.format(path) ])
+             '@0@/test_precondition_msg_is_assert_msg.cpp:4: int main(): The assertion "1 != 1" failed with the message "test passed".\n'.format(path) ])
 test('Postcondition is Assertion', runner,
      args: [ '--exact', test_postcondition_is_assert_exe.full_path(),
-             '@0@/test_postcondition_is_assert.cpp:4: The assertion "1 != 1" failed.\n'.format(path) ])
+             '@0@/test_postcondition_is_assert.cpp:4: int main(): The assertion "1 != 1" failed.\n'.format(path) ])
 test('Postcondition with Message is Assertion with Message', runner,
      args: [ '--exact', test_postcondition_msg_is_assert_msg_exe.full_path(),
-             '@0@/test_postcondition_msg_is_assert_msg.cpp:4: The assertion "1 != 1" failed with the message "test passed".\n'.format(path) ])
+             '@0@/test_postcondition_msg_is_assert_msg.cpp:4: int main(): The assertion "1 != 1" failed with the message "test passed".\n'.format(path) ])
