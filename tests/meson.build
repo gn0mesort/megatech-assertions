@@ -17,7 +17,7 @@ dependencies = [ megatech_assertions_dep ]
 config = configuration_data()
 config.set_quoted('CONFIG_TEST_TRUNCATION_STRING', ''.join(buffer))
 config.set('CONFIG_TEST_MAX_THREADS', max_test_threads)
-config_header = configure_file(configuration: config, input: files('generated/config.hpp'), output: 'config.hpp')
+config_header = configure_file(configuration: config, input: files('generated/config.hpp.in'), output: 'config.hpp')
 test_assert_msg_fail_exe = disabler()
 test_assert_msg_fail_printf_exe = disabler()
 test_parallel_assert_msg_fail_exe = disabler()
