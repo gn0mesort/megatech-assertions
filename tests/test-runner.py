@@ -5,6 +5,10 @@ from pathlib import Path
 
 import subprocess
 import sys
+import os
+
+if os.name == "posix":
+    import resource
 
 def run_test_code(program: Path, tries: int = 1) -> int:
     for i in range(tries):
@@ -52,6 +56,14 @@ def run_test_str(program: Path, expected: list[str], tries: int = 1) -> int:
     return 1
 
 def main() -> None:
+    # Try to disable coredumps, since we're going to create a bunch.
+    # Otherwise, do nothing it's fine.
+    # This should only be executed on "posix" systems (Linux, BSD, Apple, etc.).
+    if os.name == "posix":
+        try:
+            resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        except:
+            pass
     parser = ArgumentParser(description="Custom unit test script for assertion tests.")
     parser.add_argument("--expect-success", action="store_true", default=False,
                         help="Expect that the program will exit with a result of 0 and don't check for assertions.")
