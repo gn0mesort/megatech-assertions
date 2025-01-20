@@ -96,7 +96,7 @@ test('Truncate Assertion Messages with "format" Formatting', runner,
      args: [ test_truncate_assert_msg_fail_format_exe.full_path(), test_truncation_result ])
 test('Error During Assertion Failure', runner, args: [ test_assert_msg_fail_format_error_exe.full_path(),
                                                        'The following error' ])
-path = meson.current_source_dir().replace(meson.source_root(), '..')
+path = meson.current_source_dir().replace(meson.project_source_root(), '..')
 # These are brittle. If they break, double check that the output hasn't changed for some reason.
 test('Exact Assertion Match', runner,
      args: [ '--exact', test_exact_assert_fail_exe.full_path(),
