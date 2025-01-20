@@ -1,6 +1,7 @@
 project(
   'megatech-assertions',
   [ 'cpp' ],
+  meson_version: '>=1.4.0',
   version: '1.0.3',
   license: 'AGPL-3.0-or-later',
   license_files: [ 'LICENSE' ],
